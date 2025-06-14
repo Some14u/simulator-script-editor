@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Simulator Script Editor Enhancer",
+  "version": "1.0.0",
+  "description": "Browser extension to enhance Simulator.Company script editor functionality",
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://*.simulator.company/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*.simulator.company/script/*/edit/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ]
+}
