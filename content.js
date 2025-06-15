@@ -212,38 +212,7 @@
       return hasRequiredProps;
     },
 
-    setupFileSelectionInterception: function() {
-      this.debug('INIT', 'Setting up file selection interception');
-      
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.type === 'childList') {
-            const fileItems = document.querySelectorAll('[data-testid*="file"], .structure-item[data-obj-type="file"]');
-            fileItems.forEach((item) => {
-              if (!item.hasAttribute('data-enhanced')) {
-                item.setAttribute('data-enhanced', 'true');
-                item.addEventListener('click', (event) => {
-                  this.debug('CLICK', 'File item clicked:', item);
-                  
-                  if (!this.reduxInitialized) {
-                    this.initializeReduxConnection();
-                  }
-                  
-                  setTimeout(() => {
-                    this.dispatchGetScriptStructure();
-                  }, 100);
-                });
-              }
-            });
-          }
-        });
-      });
-      
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true
-      });
-    },
+
 
     initializeReduxConnection: function() {
       if (this.reduxInitialized) {
@@ -415,11 +384,16 @@
               
               setTimeout(() => {
                 if (!self.reduxInitialized) {
+                  self.debug('REDUX', 'Redux not initialized, initializing now...');
                   self.initializeReduxConnection();
                 }
                 
-                self.dispatchGetScriptStructure();
-                self.debug('REACT', '✅ Script structure refresh dispatched after file selection');
+                if (self.reduxInitialized) {
+                  self.dispatchGetScriptStructure();
+                  self.debug('REACT', '✅ Script structure refresh dispatched after file selection');
+                } else {
+                  self.debug('REACT', '❌ Redux initialization failed, cannot dispatch');
+                }
               }, 100);
               
               return result;
@@ -443,8 +417,6 @@
       this.initialized = true;
       
       this.interceptReactRuntime();
-      
-      this.setupFileSelectionInterception();
     }
   };
   
