@@ -84,33 +84,43 @@
         payload: { scriptId, envId },
       });
     },
-
-    setupReduxDispatchInterceptor: function () {
+    
+    setupReduxStoreSubscription: function() {
       const store = this.getReduxStore();
-      if (!store) {
-        console.log("[SimulatorEnhancer] Cannot setup dispatch interceptor - Redux store not available");
+      if (!store || !store.subscribe) {
+        console.log('[SimulatorEnhancer] Redux store or subscribe method not found');
         return;
       }
-
-      if (store._originalDispatch) {
-        console.log("[SimulatorEnhancer] Redux dispatch already intercepted");
+      
+      if (this.storeUnsubscribe) {
+        console.log('[SimulatorEnhancer] Store subscription already established');
         return;
       }
-
-      console.log("[SimulatorEnhancer] Setting up Redux dispatch interceptor");
-
-      const originalDispatch = store.dispatch;
-      store._originalDispatch = originalDispatch;
-
-      store.dispatch = function (action) {
-        if (action && action.type === "GET_SCRIPT_STRUCTURE_SUCCESS") {
-          console.log("[SimulatorEnhancer] GET_SCRIPT_STRUCTURE_SUCCESS intercepted:", action);
+      
+      let previousScriptContent = null;
+      
+      const unsubscribe = store.subscribe(() => {
+        try {
+          const state = store.getState();
+          const currentScriptContent = state.scriptContent;
+          
+          if (currentScriptContent && 
+              currentScriptContent.reqStatus === 'success' && 
+              currentScriptContent !== previousScriptContent) {
+            console.log('[SimulatorEnhancer] GET_SCRIPT_STRUCTURE_SUCCESS detected via store subscription:', {
+              content: currentScriptContent.content,
+              reqStatus: currentScriptContent.reqStatus
+            });
+          }
+          
+          previousScriptContent = currentScriptContent;
+        } catch (error) {
+          console.error('[SimulatorEnhancer] Error in store subscription:', error);
         }
-
-        return originalDispatch.apply(this, arguments);
-      };
-
-      console.log("[SimulatorEnhancer] Redux dispatch interceptor setup complete");
+      });
+      
+      this.storeUnsubscribe = unsubscribe;
+      console.log('[SimulatorEnhancer] Store subscription established');
     },
 
     getReduxStore: function () {
@@ -339,9 +349,9 @@
                 if (!self.reduxInitialized) {
                   self.initializeReduxConnection();
                 }
-
-                self.setupReduxDispatchInterceptor();
-
+                
+                self.setupReduxStoreSubscription();
+                
                 if (self.reduxInitialized) {
                   self.dispatchGetScriptStructure();
                 } else {
@@ -357,17 +367,30 @@
         return self.originalCreateElement.apply(self.reactRuntime, [type, props, ...children]);
       };
     },
+    
+    cleanup: function() {
+      if (this.storeUnsubscribe) {
+        this.storeUnsubscribe();
+        this.storeUnsubscribe = null;
+        console.log('[SimulatorEnhancer] Store subscription cleaned up');
+      }
+    },
 
-    init: function () {
+    init: function() {
       if (this.initialized) {
         return;
       }
 
       console.log("[SimulatorEnhancer:INIT] Initializing core functionality...");
       this.initialized = true;
-
+      
+      this.setupReduxStoreSubscription();
       this.interceptReactRuntime();
-    },
+      
+      window.addEventListener('beforeunload', () => {
+        this.cleanup();
+      });
+    }
   };
 
   window.SimulatorEnhancer.init();
