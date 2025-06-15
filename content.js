@@ -60,15 +60,15 @@
         return;
       }
       
-      this.debug('REDUX', 'Dispatching GET_SCRIPT_STRUCTURE.REQUEST', { scriptId, envId });
+      this.debug('REDUX', 'Dispatching GET_SCRIPT_STRUCTURE_REQUEST', { scriptId, envId });
       
       store.dispatch({
-        type: 'GET_SCRIPT_STRUCTURE.REQUEST',
+        type: 'GET_SCRIPT_STRUCTURE_REQUEST',
         payload: { scriptId, envId },
         callback: callback
       });
       
-      this.debug('REDUX', 'GET_SCRIPT_STRUCTURE.REQUEST dispatched successfully');
+      this.debug('REDUX', 'GET_SCRIPT_STRUCTURE_REQUEST dispatched successfully');
     },
 
     dispatchGetScriptStructure: function() {
@@ -78,12 +78,19 @@
         return;
       }
       
+      const params = this.getScriptParams();
+      if (!params) {
+        this.debug('REDUX', 'Cannot extract script parameters from URL');
+        return;
+      }
+      
+      const { scriptId } = params;
       const envId = this.getActiveEnvId();
-      this.debug('REDUX', 'Dispatching GET_SCRIPT_STRUCTURE.REQUEST with envId:', envId);
+      this.debug('REDUX', 'Dispatching GET_SCRIPT_STRUCTURE_REQUEST with:', { scriptId, envId });
       
       store.dispatch({
-        type: 'GET_SCRIPT_STRUCTURE.REQUEST',
-        payload: { envId: envId }
+        type: 'GET_SCRIPT_STRUCTURE_REQUEST',
+        payload: { scriptId, envId }
       });
     },
     
