@@ -146,33 +146,42 @@
     },
 
     findScriptEditorComponent: function() {
-      const rootElement = document.getElementById('root');
-      if (!rootElement) return null;
+      this.debug('ENV', 'Searching for ScriptEditor using selector approach');
       
-      const fiberKey = Object.keys(rootElement).find(key => 
-        key.startsWith('__reactContainer$') || key.startsWith('__reactInternalInstance$')
+      const scriptEditorElement = document.querySelector('#mainRoot > [class^="se__"]');
+      if (!scriptEditorElement) {
+        this.debug('ENV', 'ScriptEditor element not found with selector #mainRoot > [class^="se__"]');
+        return null;
+      }
+      
+      this.debug('ENV', 'Found ScriptEditor element:', scriptEditorElement);
+      
+      const fiberKey = Object.keys(scriptEditorElement).find(key => 
+        key.startsWith('__reactFiber$') || 
+        key.startsWith('__reactInternalInstance$') ||
+        key.startsWith('__reactContainer$')
       );
       
-      if (!fiberKey) return null;
-      
-      const fiber = rootElement[fiberKey].current || rootElement[fiberKey];
-      return this.traverseFiberForScriptEditor(fiber);
-    },
-
-    traverseFiberForScriptEditor: function(fiber) {
-      if (!fiber) return null;
-      
-      if (fiber.type && fiber.type.name === 'ScriptEditor') {
-        return fiber;
+      if (!fiberKey) {
+        this.debug('ENV', 'React fiber key not found on ScriptEditor element');
+        return null;
       }
       
-      let child = fiber.child;
-      while (child) {
-        const result = this.traverseFiberForScriptEditor(child);
-        if (result) return result;
-        child = child.sibling;
+      let fiber = scriptEditorElement[fiberKey];
+      this.debug('ENV', 'Starting fiber traversal from element fiber');
+      
+      while (fiber && fiber.return) {
+        fiber = fiber.return;
+        if (fiber.type && typeof fiber.type === 'function') {
+          this.debug('ENV', 'Found first component in fiber tree:', {
+            componentName: fiber.type.name || 'Anonymous',
+            hasHooks: !!fiber.memoizedState
+          });
+          return fiber;
+        }
       }
       
+      this.debug('ENV', 'No component found in fiber traversal');
       return null;
     },
 
