@@ -6,6 +6,7 @@
   window.SimulatorEnhancer = {
     version: '1.0.0',
     initialized: false,
+    reduxInitialized: false,
     debugEnabled: true,
     reactRuntime: null,
     originalCreateElement: null,
@@ -69,6 +70,22 @@
       
       this.debug('REDUX', 'GET_SCRIPT_STRUCTURE.REQUEST dispatched successfully');
     },
+
+    dispatchGetScriptStructure: function() {
+      const store = this.getReduxStore();
+      if (!store) {
+        this.debug('REDUX', 'Redux store not available');
+        return;
+      }
+      
+      const envId = this.getActiveEnvId();
+      this.debug('REDUX', 'Dispatching GET_SCRIPT_STRUCTURE.REQUEST with envId:', envId);
+      
+      store.dispatch({
+        type: 'GET_SCRIPT_STRUCTURE.REQUEST',
+        payload: { envId: envId }
+      });
+    },
     
     getReduxStore: function() {
       this.debug('REDUX', 'Getting Redux store via reliable fiber method');
@@ -110,38 +127,140 @@
     },
 
     getActiveEnvId: function() {
-      this.debug('REDUX', 'Searching for active environment ID');
+      this.debug('ENV', 'Searching for activeEnv in React component state');
+      
+      const scriptEditorComponent = this.findScriptEditorComponent();
+      if (!scriptEditorComponent) {
+        this.debug('ENV', 'ScriptEditor component not found');
+        return 'default';
+      }
+      
+      const activeEnv = this.extractActiveEnvFromHooks(scriptEditorComponent);
+      if (activeEnv && activeEnv.id) {
+        this.debug('ENV', 'Found activeEnv:', activeEnv);
+        return activeEnv.id;
+      }
+      
+      this.debug('ENV', 'activeEnv not found, using default');
+      return 'default';
+    },
+
+    findScriptEditorComponent: function() {
+      const rootElement = document.getElementById('root');
+      if (!rootElement) return null;
+      
+      const fiberKey = Object.keys(rootElement).find(key => 
+        key.startsWith('__reactContainer$') || key.startsWith('__reactInternalInstance$')
+      );
+      
+      if (!fiberKey) return null;
+      
+      const fiber = rootElement[fiberKey].current || rootElement[fiberKey];
+      return this.traverseFiberForScriptEditor(fiber);
+    },
+
+    traverseFiberForScriptEditor: function(fiber) {
+      if (!fiber) return null;
+      
+      if (fiber.type && fiber.type.name === 'ScriptEditor') {
+        return fiber;
+      }
+      
+      let child = fiber.child;
+      while (child) {
+        const result = this.traverseFiberForScriptEditor(child);
+        if (result) return result;
+        child = child.sibling;
+      }
+      
+      return null;
+    },
+
+    extractActiveEnvFromHooks: function(scriptEditorFiber) {
+      if (!scriptEditorFiber.memoizedState) return null;
+      
+      let hook = scriptEditorFiber.memoizedState;
+      while (hook) {
+        const state = hook.memoizedState;
+        
+        if (this.isActiveEnvObject(state)) {
+          return state;
+        }
+        
+        hook = hook.next;
+      }
+      
+      return null;
+    },
+
+    isActiveEnvObject: function(obj) {
+      if (!obj || typeof obj !== 'object') return false;
+      
+      const hasRequiredProps = 
+        typeof obj.id !== 'undefined' &&
+        typeof obj.title === 'string' &&
+        typeof obj.actorId === 'string' &&
+        typeof obj.corezoidCredentials === 'object' &&
+        typeof obj.rootFolderId !== 'undefined' &&
+        typeof obj.isSystem === 'boolean';
+      
+      this.debug('ENV', 'Checking object for activeEnv properties:', {
+        obj: obj,
+        hasRequiredProps: hasRequiredProps
+      });
+      
+      return hasRequiredProps;
+    },
+
+    setupFileSelectionInterception: function() {
+      this.debug('INIT', 'Setting up file selection interception');
+      
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'childList') {
+            const fileItems = document.querySelectorAll('[data-testid*="file"], .structure-item[data-obj-type="file"]');
+            fileItems.forEach((item) => {
+              if (!item.hasAttribute('data-enhanced')) {
+                item.setAttribute('data-enhanced', 'true');
+                item.addEventListener('click', (event) => {
+                  this.debug('CLICK', 'File item clicked:', item);
+                  
+                  if (!this.reduxInitialized) {
+                    this.initializeReduxConnection();
+                  }
+                  
+                  setTimeout(() => {
+                    this.dispatchGetScriptStructure();
+                  }, 100);
+                });
+              }
+            });
+          }
+        });
+      });
+      
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+    },
+
+    initializeReduxConnection: function() {
+      if (this.reduxInitialized) {
+        this.debug('REDUX', 'Redux already initialized, skipping');
+        return;
+      }
+      
+      this.debug('REDUX', 'Initializing Redux connection...');
       
       const store = this.getReduxStore();
-      if (!store) {
-        this.debug('REDUX', 'Redux store not available for envId lookup');
-        return null;
-      }
-      
-      try {
-        const state = store.getState();
-        this.debug('REDUX', 'Redux state retrieved for envId search');
-        
-        if (state.scriptContent && state.scriptContent.envId) {
-          this.debug('REDUX', 'Found envId in scriptContent state:', state.scriptContent.envId);
-          return state.scriptContent.envId;
-        }
-        
-        if (state.scriptEditor && state.scriptEditor.activeEnv) {
-          this.debug('REDUX', 'Found activeEnv in scriptEditor state:', state.scriptEditor.activeEnv);
-          return state.scriptEditor.activeEnv;
-        }
-        
-        this.debug('REDUX', 'EnvId not found in Redux state, using default');
-        return 'default';
-        
-      } catch (error) {
-        this.debug('REDUX', 'Error accessing Redux state for envId:', error);
-        return 'default';
+      if (store) {
+        this.reduxInitialized = true;
+        this.debug('REDUX', 'Redux connection established successfully');
+      } else {
+        this.debug('REDUX', 'Redux connection failed');
       }
     },
-    
-
     
     interceptReactRuntime: function() {
       if (this.webpackHooksActive) {
@@ -295,11 +414,12 @@
               const result = originalHandleSelect.apply(this, args);
               
               setTimeout(() => {
-                self.refreshScriptStructure((structure) => {
-                  if (structure) {
-                    self.debug('REACT', '✅ Script structure refresh dispatched after file selection');
-                  }
-                });
+                if (!self.reduxInitialized) {
+                  self.initializeReduxConnection();
+                }
+                
+                self.dispatchGetScriptStructure();
+                self.debug('REACT', '✅ Script structure refresh dispatched after file selection');
               }, 100);
               
               return result;
@@ -324,28 +444,7 @@
       
       this.interceptReactRuntime();
       
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-          this.debug('INIT', 'DOM loaded, connecting to Redux store');
-          this.connectReduxStore();
-        });
-      } else {
-        this.debug('INIT', 'DOM already loaded, connecting to Redux store immediately');
-        this.connectReduxStore();
-      }
-    },
-    
-    connectReduxStore: function() {
-      this.debug('REDUX', 'Attempting to connect to Redux store');
-      
-      setTimeout(() => {
-        const store = this.getReduxStore();
-        if (store) {
-          this.debug('REDUX', 'Successfully connected to Redux store');
-        } else {
-          this.debug('REDUX', 'Redux store not available, will retry on demand');
-        }
-      }, 500);
+      this.setupFileSelectionInterception();
     }
   };
   
