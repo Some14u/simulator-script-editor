@@ -13,7 +13,7 @@
     {
       "matches": ["*://*.simulator.company/script/*/edit/*"],
       "js": ["content.js"],
-      "run_at": "document_start"
+      "run_at": "был rt"
     }
   ],
   "web_accessible_resources": [

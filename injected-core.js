@@ -107,6 +107,22 @@
       return false;
     },
     
+    waitForRedux: function() {
+      const self = this;
+      const checkRedux = () => {
+        if (window.__REDUX_DEVTOOLS_EXTENSION__ || window.Redux) {
+          self.debug('REDUX', 'Redux detected via global objects');
+          self.findReduxStore();
+        } else if (window.store || self.findReduxStore()) {
+          self.debug('REDUX', 'Redux store detected');
+        } else {
+          self.debug('REDUX', 'Redux not found, retrying in 500ms...');
+          setTimeout(checkRedux, 500);
+        }
+      };
+      checkRedux();
+    },
+    
     interceptReactRuntime: function() {
       if (this.webpackHooksActive) {
         this.debug('REACT', 'Webpack hooks already active');
@@ -197,45 +213,57 @@
       
       const self = this;
       this.reactRuntime.createElement = function(type, props, ...children) {
-        if (type && type.name === 'StructureItem' && props) {
-          self.debug('REACT', '🎯 StructureItem createElement intercepted:', { 
-            typeName: type.name, 
+        if (type && props && 
+            typeof props.objType === 'string' &&
+            typeof props.handleSelect === 'function' &&
+            typeof props.level === 'number' &&
+            props.hasOwnProperty('activeItem') &&
+            props.hasOwnProperty('handleUpdate') &&
+            props.hasOwnProperty('handleRemove') &&
+            props.hasOwnProperty('handleDuplicate')) {
+          
+          self.debug('REACT', '🎯 StructureItem createElement intercepted by props:', { 
             objType: props.objType,
-            title: props.title 
+            title: props.title,
+            level: props.level,
+            id: props.id
           });
           
           if (props.objType === 'file') {
             self.debug('REACT', '📄 File StructureItem detected:', {
               id: props.id,
               title: props.title,
-              objType: props.objType
+              objType: props.objType,
+              level: props.level
             });
             
-            if (props.handleSelect) {
-              const originalHandleSelect = props.handleSelect;
-              props.handleSelect = function(...args) {
-                self.debug('REACT', '🖱️ File selected via handleSelect:', args);
-                
-                const result = originalHandleSelect.apply(this, args);
-                
-                setTimeout(() => {
-                  self.refreshScriptStructure((structure) => {
-                    if (structure) {
-                      self.debug('REACT', '✅ Script structure refreshed after file selection');
-                    }
-                  });
-                }, 100);
-                
-                return result;
-              };
-            }
+            const originalHandleSelect = props.handleSelect;
+            props.handleSelect = function(...args) {
+              self.debug('REACT', '🖱️ File selected via handleSelect:', {
+                id: props.id,
+                title: props.title,
+                args: args
+              });
+              
+              const result = originalHandleSelect.apply(this, args);
+              
+              setTimeout(() => {
+                self.refreshScriptStructure((structure) => {
+                  if (structure) {
+                    self.debug('REACT', '✅ Script structure refreshed after file selection');
+                  }
+                });
+              }, 100);
+              
+              return result;
+            };
           }
         }
         
         return self.originalCreateElement.apply(self.reactRuntime, [type, props, ...children]);
       };
       
-      this.debug('REACT', '✅ createElement successfully overridden');
+      this.debug('REACT', '✅ createElement successfully overridden with prop-based detection');
     },
     
     init: function() {
@@ -248,7 +276,7 @@
       this.initialized = true;
       
       this.interceptReactRuntime();
-      this.findReduxStore();
+      this.waitForRedux();
     }
   };
   
