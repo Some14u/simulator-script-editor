@@ -11,6 +11,8 @@
     reactRuntime: null,
     originalCreateElement: null,
     webpackHooksActive: false,
+    lastSelectedFile: null,
+    pendingFileUpdate: false,
 
     debug: function (category, message, ...args) {
       if (!this.debugEnabled) return;
@@ -98,6 +100,7 @@
       }
       
       let previousScriptContent = null;
+      const self = this;
       
       const unsubscribe = store.subscribe(() => {
         try {
@@ -111,6 +114,11 @@
               content: currentScriptContent.content,
               reqStatus: currentScriptContent.reqStatus
             });
+            
+            if (self.pendingFileUpdate && self.lastSelectedFile) {
+              console.log('[SimulatorEnhancer] Executing deferred file update for:', self.lastSelectedFile);
+              self.executeDeferredFileUpdate();
+            }
           }
           
           previousScriptContent = currentScriptContent;
@@ -343,6 +351,22 @@
           if (props.objType === "file") {
             const originalHandleSelect = props.handleSelect;
             props.handleSelect = function (...args) {
+              console.log('[SimulatorEnhancer] File selected, storing for deferred update:', {
+                id: props.id,
+                title: props.title,
+                objType: props.objType
+              });
+              
+              self.lastSelectedFile = {
+                id: props.id,
+                title: props.title,
+                objType: props.objType,
+                originalHandler: originalHandleSelect,
+                handlerContext: this,
+                handlerArgs: args
+              };
+              self.pendingFileUpdate = true;
+              
               const result = originalHandleSelect.apply(this, args);
 
               setTimeout(() => {
@@ -368,12 +392,35 @@
       };
     },
     
+    executeDeferredFileUpdate: function() {
+      if (!this.lastSelectedFile || !this.pendingFileUpdate) {
+        console.log('[SimulatorEnhancer] No pending file update to execute');
+        return;
+      }
+      
+      console.log('[SimulatorEnhancer] Executing deferred file update for:', this.lastSelectedFile.title);
+      
+      try {
+        const { originalHandler, handlerContext, handlerArgs } = this.lastSelectedFile;
+        originalHandler.apply(handlerContext, handlerArgs);
+        
+        this.pendingFileUpdate = false;
+        console.log('[SimulatorEnhancer] Deferred file update completed successfully');
+      } catch (error) {
+        console.error('[SimulatorEnhancer] Error executing deferred file update:', error);
+        this.pendingFileUpdate = false;
+      }
+    },
+
     cleanup: function() {
       if (this.storeUnsubscribe) {
         this.storeUnsubscribe();
         this.storeUnsubscribe = null;
         console.log('[SimulatorEnhancer] Store subscription cleaned up');
       }
+      
+      this.lastSelectedFile = null;
+      this.pendingFileUpdate = false;
     },
 
     init: function() {
