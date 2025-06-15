@@ -10,7 +10,7 @@
     reactRuntime: null,
     originalCreateElement: null,
     webpackHooksActive: false,
-    reduxDispatch: null,
+
     
     debug: function(category, message, ...args) {
       if (!this.debugEnabled) return;
@@ -74,19 +74,56 @@
       });
     },
     
-    updateReduxState: function(structureData) {
-      this.debug('REDUX', 'Attempting to update Redux state with structure data');
-      if (!this.reduxDispatch) {
-        this.findScriptEditorDispatch();
+    getReduxStore: function() {
+      this.debug('REDUX', 'Getting Redux store via reliable fiber method');
+      
+      const rootEl = document.getElementById('root');
+      if (!rootEl) {
+        this.debug('REDUX', 'Root element not found');
+        return null;
       }
       
-      if (!this.reduxDispatch) {
-        this.debug('REDUX', 'Redux dispatch not available');
+      const fiberKey = Object.keys(rootEl).find(k => 
+        k.startsWith('__reactContainer$') || k.startsWith('__reactInternalInstance$')
+      );
+      
+      if (!fiberKey) {
+        this.debug('REDUX', 'React container key not found');
+        return null;
+      }
+      
+      const fiber = rootEl[fiberKey].current || rootEl[fiberKey];
+      if (!fiber || !fiber.memoizedState || !fiber.memoizedState.element || !fiber.memoizedState.element.props) {
+        this.debug('REDUX', 'Redux store not found in fiber structure');
+        return null;
+      }
+      
+      const store = fiber.memoizedState.element.props.store;
+      if (store && typeof store.dispatch === 'function') {
+        this.debug('REDUX', 'Redux store successfully retrieved:', {
+          hasDispatch: !!store.dispatch,
+          hasGetState: !!store.getState,
+          hasSubscribe: !!store.subscribe,
+          hasRunSaga: !!store.runSaga
+        });
+        return store;
+      }
+      
+      this.debug('REDUX', 'Invalid Redux store structure');
+      return null;
+    },
+
+    updateReduxState: function(structureData) {
+      this.debug('REDUX', 'Attempting to update Redux state with structure data');
+      
+      const store = this.getReduxStore();
+      if (!store) {
+        this.debug('REDUX', 'Redux store not available');
         return;
       }
       
       this.debug('REDUX', 'Dispatching GET_SCRIPT_STRUCTURE.SUCCESS action');
-      this.reduxDispatch({
+      store.dispatch({
         type: 'GET_SCRIPT_STRUCTURE.SUCCESS',
         payload: { content: structureData }
       });
@@ -94,56 +131,7 @@
       this.debug('REDUX', 'Redux state updated with fresh structure');
     },
     
-    findScriptEditorDispatch: function() {
-      this.debug('FIBER', 'Searching for ScriptEditor component via React Fiber');
-      
-      const findReactFiberNode = (dom) => {
-        const key = Object.keys(dom).find(key => key.startsWith('__reactFiber') || key.startsWith('__reactInternalInstance'));
-        return dom[key];
-      };
-      
-      const traverseFiber = (fiber, depth = 0) => {
-        if (!fiber || depth > 20) return null;
-        
-        if (fiber.type && fiber.type.name === 'ScriptEditor') {
-          this.debug('FIBER', 'Found ScriptEditor component at depth:', depth);
-          return fiber;
-        }
-        
-        let result = null;
-        if (fiber.child) {
-          result = traverseFiber(fiber.child, depth + 1);
-        }
-        if (!result && fiber.sibling) {
-          result = traverseFiber(fiber.sibling, depth + 1);
-        }
-        return result;
-      };
-      
-      const rootElements = document.querySelectorAll('[id*="root"], [class*="app"], [class*="container"]');
-      for (let element of rootElements) {
-        const fiberNode = findReactFiberNode(element);
-        if (fiberNode) {
-          const scriptEditorFiber = traverseFiber(fiberNode);
-          if (scriptEditorFiber && scriptEditorFiber.memoizedProps) {
-            this.debug('FIBER', 'ScriptEditor fiber found, extracting dispatch from hooks');
-            
-            let currentHook = scriptEditorFiber.memoizedState;
-            while (currentHook) {
-              if (currentHook.queue && currentHook.queue.dispatch) {
-                this.reduxDispatch = currentHook.queue.dispatch;
-                this.debug('FIBER', 'Redux dispatch found via useDispatch hook');
-                return true;
-              }
-              currentHook = currentHook.next;
-            }
-          }
-        }
-      }
-      
-      this.debug('FIBER', 'ScriptEditor component or dispatch not found');
-      return false;
-    },
+
     
     interceptReactRuntime: function() {
       if (this.webpackHooksActive) {
@@ -325,7 +313,6 @@
       this.initialized = true;
       
       this.interceptReactRuntime();
-      this.findScriptEditorDispatch();
     }
   };
   
