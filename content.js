@@ -355,7 +355,17 @@
               };
               self.pendingFileUpdate = true;
               
-              originalHandleSelect.apply(this, args);
+              if (!self.reduxInitialized) {
+                self.initializeReduxConnection();
+              }
+              
+              self.setupReduxStoreSubscription();
+              
+              if (self.reduxInitialized) {
+                self.dispatchGetScriptStructure();
+              } else {
+                console.error("[SimulatorEnhancer:ERROR] Redux initialization failed, cannot dispatch");
+              }
             };
           }
         }
