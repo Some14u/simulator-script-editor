@@ -11,6 +11,8 @@
     reactRuntime: null,
     originalCreateElement: null,
     webpackHooksActive: false,
+    deferredFileOperations: [],
+    reduxSuccessListenerSetup: false,
 
     
     debug: function(category, message, ...args) {
@@ -80,10 +82,151 @@
       const { scriptId } = params;
       const envId = this.getActiveEnvId();
       
+      console.log('[SimulatorEnhancer:DEFERRED] Dispatching GET_SCRIPT_STRUCTURE_REQUEST for deferred operations', {
+        scriptId: scriptId,
+        envId: envId,
+        deferredCount: this.deferredFileOperations.length
+      });
+      
       store.dispatch({
         type: 'GET_SCRIPT_STRUCTURE_REQUEST',
         payload: { scriptId, envId }
       });
+    },
+    
+    addDeferredFileOperation: function(fileId, fileName, originalHandleSelect, selectArgs) {
+      const operation = {
+        id: Date.now() + Math.random(),
+        fileId: fileId,
+        fileName: fileName,
+        originalHandleSelect: originalHandleSelect,
+        selectArgs: selectArgs,
+        timestamp: Date.now()
+      };
+      
+      this.deferredFileOperations.push(operation);
+      console.log('[SimulatorEnhancer:DEFERRED] Added deferred file operation:', {
+        operationId: operation.id,
+        fileId: fileId,
+        fileName: fileName,
+        totalDeferred: this.deferredFileOperations.length,
+        timestamp: operation.timestamp
+      });
+      
+      return operation.id;
+    },
+    
+    executeDeferredFileOperations: function() {
+      console.log('[SimulatorEnhancer:DEFERRED] Starting execution of deferred file operations:', {
+        count: this.deferredFileOperations.length
+      });
+      
+      if (this.deferredFileOperations.length === 0) {
+        console.log('[SimulatorEnhancer:DEFERRED] No deferred operations to execute');
+        return;
+      }
+      
+      const operations = [...this.deferredFileOperations];
+      this.deferredFileOperations = [];
+      
+      operations.forEach((operation, index) => {
+        console.log('[SimulatorEnhancer:DEFERRED] Executing operation', {
+          step: `${index + 1}/${operations.length}`,
+          operationId: operation.id,
+          fileId: operation.fileId,
+          fileName: operation.fileName,
+          age: Date.now() - operation.timestamp
+        });
+        
+        try {
+          const result = operation.originalHandleSelect.apply(null, operation.selectArgs);
+          console.log('[SimulatorEnhancer:DEFERRED] Operation executed successfully:', {
+            operationId: operation.id,
+            result: result
+          });
+        } catch (error) {
+          console.error('[SimulatorEnhancer:DEFERRED] Operation execution failed:', {
+            operationId: operation.id,
+            error: error.message,
+            stack: error.stack
+          });
+        }
+      });
+      
+      console.log('[SimulatorEnhancer:DEFERRED] All deferred operations completed');
+    },
+    
+    setupReduxSuccessListener: function() {
+      if (this.reduxSuccessListenerSetup) {
+        console.log('[SimulatorEnhancer:DEFERRED] Redux success listener already setup');
+        return;
+      }
+      
+      const store = this.getReduxStore();
+      if (!store) {
+        console.error('[SimulatorEnhancer:DEFERRED] Cannot setup success listener - Redux store not available');
+        return;
+      }
+      
+      console.log('[SimulatorEnhancer:DEFERRED] Setting up GET_SCRIPT_STRUCTURE_SUCCESS listener');
+      
+      const originalDispatch = store.dispatch;
+      const self = this;
+      
+      store.dispatch = function(action) {
+        const result = originalDispatch.apply(this, arguments);
+        
+        if (action && action.type === 'GET_SCRIPT_STRUCTURE_SUCCESS') {
+          console.log('[SimulatorEnhancer:DEFERRED] GET_SCRIPT_STRUCTURE_SUCCESS intercepted:', {
+            actionType: action.type,
+            hasPayload: !!action.payload,
+            deferredCount: self.deferredFileOperations.length,
+            payloadKeys: action.payload ? Object.keys(action.payload) : []
+          });
+          
+          if (self.deferredFileOperations.length > 0) {
+            console.log('[SimulatorEnhancer:DEFERRED] Structure updated, scheduling deferred file operations execution');
+            setTimeout(() => {
+              self.executeDeferredFileOperations();
+            }, 150);
+          } else {
+            console.log('[SimulatorEnhancer:DEFERRED] No deferred operations to execute after structure update');
+          }
+        }
+        
+        return result;
+      };
+      
+      this.reduxSuccessListenerSetup = true;
+      console.log('[SimulatorEnhancer:DEFERRED] Redux dispatch successfully patched for success listener');
+    },
+    
+    cleanupOldDeferredOperations: function() {
+      const maxAge = 30000; // 30 seconds
+      const now = Date.now();
+      const initialCount = this.deferredFileOperations.length;
+      
+      this.deferredFileOperations = this.deferredFileOperations.filter(operation => {
+        const age = now - operation.timestamp;
+        if (age > maxAge) {
+          console.log('[SimulatorEnhancer:DEFERRED] Removing old deferred operation:', {
+            operationId: operation.id,
+            age: age,
+            fileId: operation.fileId,
+            fileName: operation.fileName
+          });
+          return false;
+        }
+        return true;
+      });
+      
+      const removedCount = initialCount - this.deferredFileOperations.length;
+      if (removedCount > 0) {
+        console.log('[SimulatorEnhancer:DEFERRED] Cleaned up old deferred operations:', {
+          removedCount: removedCount,
+          remainingCount: this.deferredFileOperations.length
+        });
+      }
     },
     
     getReduxStore: function() {
@@ -190,14 +333,18 @@
 
     initializeReduxConnection: function() {
       if (this.reduxInitialized) {
+        console.log('[SimulatorEnhancer:DEFERRED] Redux already initialized, skipping');
         return;
       }
+      
+      console.log('[SimulatorEnhancer:DEFERRED] Initializing Redux connection...');
       
       const store = this.getReduxStore();
       if (store) {
         this.reduxInitialized = true;
+        console.log('[SimulatorEnhancer:DEFERRED] Redux connection established successfully');
       } else {
-        console.error('[SimulatorEnhancer:ERROR] Redux connection failed');
+        console.error('[SimulatorEnhancer:DEFERRED] Redux connection failed');
       }
     },
     
@@ -316,23 +463,63 @@
             props.hasOwnProperty('handleDuplicate')) {
           
           if (props.objType === 'file') {
+            console.log('[SimulatorEnhancer:DEFERRED] File StructureItem detected:', {
+              id: props.id,
+              title: props.title,
+              objType: props.objType,
+              level: props.level
+            });
+            
             const originalHandleSelect = props.handleSelect;
             props.handleSelect = function(...args) {
-              const result = originalHandleSelect.apply(this, args);
+              console.log('[SimulatorEnhancer:DEFERRED] File selection intercepted:', {
+                id: props.id,
+                title: props.title,
+                args: args,
+                argsLength: args.length
+              });
+              
+              const operationId = self.addDeferredFileOperation(
+                props.id,
+                props.title,
+                originalHandleSelect,
+                args
+              );
+              
+              console.log('[SimulatorEnhancer:DEFERRED] File operation deferred, triggering structure refresh:', {
+                operationId: operationId,
+                fileId: props.id,
+                fileName: props.title
+              });
               
               setTimeout(() => {
                 if (!self.reduxInitialized) {
+                  console.log('[SimulatorEnhancer:DEFERRED] Initializing Redux connection for deferred operation');
                   self.initializeReduxConnection();
                 }
                 
+                if (!self.reduxSuccessListenerSetup) {
+                  console.log('[SimulatorEnhancer:DEFERRED] Setting up Redux success listener');
+                  self.setupReduxSuccessListener();
+                }
+                
                 if (self.reduxInitialized) {
+                  console.log('[SimulatorEnhancer:DEFERRED] Dispatching structure refresh for deferred operation:', {
+                    operationId: operationId
+                  });
                   self.dispatchGetScriptStructure();
                 } else {
-                  console.error('[SimulatorEnhancer:ERROR] Redux initialization failed, cannot dispatch');
+                  console.error('[SimulatorEnhancer:DEFERRED] Redux initialization failed, executing operation immediately:', {
+                    operationId: operationId
+                  });
+                  setTimeout(() => {
+                    self.executeDeferredFileOperations();
+                  }, 100);
                 }
-              }, 100);
+              }, 50);
               
-              return result;
+              console.log('[SimulatorEnhancer:DEFERRED] Original handleSelect execution prevented, will execute after structure update');
+              return undefined;
             };
           }
         }
@@ -350,6 +537,12 @@
       this.initialized = true;
       
       this.interceptReactRuntime();
+      
+      setInterval(() => {
+        this.cleanupOldDeferredOperations();
+      }, 15000); // Clean up every 15 seconds
+      
+      console.log('[SimulatorEnhancer:INIT] Deferred file operations system initialized');
     }
   };
   
