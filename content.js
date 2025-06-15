@@ -135,54 +135,81 @@
       const CHUNK = 'webpackChunk_control_front_end_app';
       const self = this;
 
-      Object.defineProperty(window, CHUNK, {
-        configurable: true,
-        set: (chunkArray) => {
-          self.debug('REACT', 'Webpack chunk array assigned');
-          
-          Object.defineProperty(chunkArray, 'push', {
-            configurable: true,
-            set: (finalJsonpPush) => {
-              self.debug('REACT', 'Webpack push method being replaced');
-              
-              Object.defineProperty(chunkArray, 'push', {
-                value: (payload) => {
-                  const [, modules] = payload;
-                  for (const [modId, factory] of Object.entries(modules)) {
-                    modules[modId] = (module, exports, require) => {
-                      factory(module, exports, require);
+      if (window[CHUNK] && Array.isArray(window[CHUNK])) {
+        self.debug('REACT', 'Webpack chunk array already exists, attaching interceptor');
+        const existingChunkArray = window[CHUNK];
+        self.attachPushInterceptor(existingChunkArray);
+      } else {
+        self.debug('REACT', 'Webpack chunk array not found, setting up property interceptor');
+        Object.defineProperty(window, CHUNK, {
+          configurable: true,
+          set: (chunkArray) => {
+            self.debug('REACT', 'Webpack chunk array assigned via property setter');
+            self.attachPushInterceptor(chunkArray);
+            delete window[CHUNK];
+            window[CHUNK] = chunkArray;
+          },
+          get: () => undefined,
+        });
+      }
+    },
+    
+    attachPushInterceptor: function(chunkArray) {
+      const self = this;
+      
+      if (chunkArray.push && typeof chunkArray.push === 'function' && chunkArray.push !== Array.prototype.push) {
+        self.debug('REACT', 'Custom push method already exists, intercepting it');
+        const originalPush = chunkArray.push;
+        chunkArray.push = function(payload) {
+          self.interceptWebpackPayload(payload);
+          return originalPush.call(this, payload);
+        };
+      } else {
+        self.debug('REACT', 'Setting up push method interceptor');
+        Object.defineProperty(chunkArray, 'push', {
+          configurable: true,
+          set: (finalJsonpPush) => {
+            self.debug('REACT', 'Webpack push method being replaced');
+            
+            Object.defineProperty(chunkArray, 'push', {
+              value: (payload) => {
+                self.interceptWebpackPayload(payload);
+                return finalJsonpPush.call(this, payload);
+              },
+            });
+          },
+          get: () => Array.prototype.push,
+        });
+      }
+    },
+    
+    interceptWebpackPayload: function(payload) {
+      const self = this;
+      const [, modules] = payload;
+      
+      for (const [modId, factory] of Object.entries(modules)) {
+        modules[modId] = (module, exports, require) => {
+          factory(module, exports, require);
 
-                      const isNamespaceWrapper = (obj) =>
-                        typeof obj === 'object' &&
-                        Symbol.toStringTag in obj &&
-                        obj[Symbol.toStringTag] === 'Module';
+          const isNamespaceWrapper = (obj) =>
+            typeof obj === 'object' &&
+            Symbol.toStringTag in obj &&
+            obj[Symbol.toStringTag] === 'Module';
 
-                      const isReact =
-                        !isNamespaceWrapper(exports)
-                        && exports.createElement
-                        && !(exports.h && exports.options);
+          const isReact =
+            !isNamespaceWrapper(exports)
+            && exports.createElement
+            && !(exports.h && exports.options);
 
-                      if (isReact) {
-                        self.debug('REACT', '✅ React runtime found →', exports);
-                        self.reactRuntime = exports;
-                        self.originalCreateElement = exports.createElement;
-                        self.overrideCreateElement();
-                        self.cleanupWebpackHooks();
-                      }
-                    };
-                  }
-                  return finalJsonpPush.call(this, payload);
-                },
-              });
-            },
-            get: () => Array.prototype.push,
-          });
-
-          delete window[CHUNK];
-          window[CHUNK] = chunkArray;
-        },
-        get: () => undefined,
-      });
+          if (isReact) {
+            self.debug('REACT', '✅ React runtime found →', exports);
+            self.reactRuntime = exports;
+            self.originalCreateElement = exports.createElement;
+            self.overrideCreateElement();
+            self.cleanupWebpackHooks();
+          }
+        };
+      }
     },
     
     cleanupWebpackHooks: function() {
@@ -280,12 +307,6 @@
     }
   };
   
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      window.SimulatorEnhancer.init();
-    });
-  } else {
-    window.SimulatorEnhancer.init();
-  }
+  window.SimulatorEnhancer.init();
   
 })();
