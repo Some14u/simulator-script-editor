@@ -10,7 +10,7 @@
     reactRuntime: null,
     originalCreateElement: null,
     webpackHooksActive: false,
-    reduxStore: null,
+    reduxDispatch: null,
     
     debug: function(category, message, ...args) {
       if (!this.debugEnabled) return;
@@ -76,51 +76,73 @@
     
     updateReduxState: function(structureData) {
       this.debug('REDUX', 'Attempting to update Redux state with structure data');
-      if (!this.reduxStore) {
-        this.findReduxStore();
+      if (!this.reduxDispatch) {
+        this.findScriptEditorDispatch();
       }
       
-      if (!this.reduxStore) {
-        this.debug('REDUX', 'Redux store not available');
+      if (!this.reduxDispatch) {
+        this.debug('REDUX', 'Redux dispatch not available');
         return;
       }
       
-      this.debug('REDUX', 'Dispatching GET_SCRIPT_STRUCTURE_SUCCESS action');
-      this.reduxStore.dispatch({
-        type: 'GET_SCRIPT_STRUCTURE_SUCCESS',
+      this.debug('REDUX', 'Dispatching GET_SCRIPT_STRUCTURE.SUCCESS action');
+      this.reduxDispatch({
+        type: 'GET_SCRIPT_STRUCTURE.SUCCESS',
         payload: { content: structureData }
       });
       
       this.debug('REDUX', 'Redux state updated with fresh structure');
     },
     
-    findReduxStore: function() {
-      const possibleStoreKeys = ['store', '__store__', '_store', 'reduxStore'];
-      for (let key of possibleStoreKeys) {
-        if (window[key] && typeof window[key].getState === 'function') {
-          this.reduxStore = window[key];
-          this.debug('REDUX', 'Redux store found:', key);
-          return true;
+    findScriptEditorDispatch: function() {
+      this.debug('FIBER', 'Searching for ScriptEditor component via React Fiber');
+      
+      const findReactFiberNode = (dom) => {
+        const key = Object.keys(dom).find(key => key.startsWith('__reactFiber') || key.startsWith('__reactInternalInstance'));
+        return dom[key];
+      };
+      
+      const traverseFiber = (fiber, depth = 0) => {
+        if (!fiber || depth > 20) return null;
+        
+        if (fiber.type && fiber.type.name === 'ScriptEditor') {
+          this.debug('FIBER', 'Found ScriptEditor component at depth:', depth);
+          return fiber;
+        }
+        
+        let result = null;
+        if (fiber.child) {
+          result = traverseFiber(fiber.child, depth + 1);
+        }
+        if (!result && fiber.sibling) {
+          result = traverseFiber(fiber.sibling, depth + 1);
+        }
+        return result;
+      };
+      
+      const rootElements = document.querySelectorAll('[id*="root"], [class*="app"], [class*="container"]');
+      for (let element of rootElements) {
+        const fiberNode = findReactFiberNode(element);
+        if (fiberNode) {
+          const scriptEditorFiber = traverseFiber(fiberNode);
+          if (scriptEditorFiber && scriptEditorFiber.memoizedProps) {
+            this.debug('FIBER', 'ScriptEditor fiber found, extracting dispatch from hooks');
+            
+            let currentHook = scriptEditorFiber.memoizedState;
+            while (currentHook) {
+              if (currentHook.queue && currentHook.queue.dispatch) {
+                this.reduxDispatch = currentHook.queue.dispatch;
+                this.debug('FIBER', 'Redux dispatch found via useDispatch hook');
+                return true;
+              }
+              currentHook = currentHook.next;
+            }
+          }
         }
       }
-      this.debug('REDUX', 'Redux store not found');
+      
+      this.debug('FIBER', 'ScriptEditor component or dispatch not found');
       return false;
-    },
-    
-    waitForRedux: function() {
-      const self = this;
-      const checkRedux = () => {
-        if (window.__REDUX_DEVTOOLS_EXTENSION__ || window.Redux) {
-          self.debug('REDUX', 'Redux detected via global objects');
-          self.findReduxStore();
-        } else if (window.store || self.findReduxStore()) {
-          self.debug('REDUX', 'Redux store detected');
-        } else {
-          self.debug('REDUX', 'Redux not found, retrying in 500ms...');
-          setTimeout(checkRedux, 500);
-        }
-      };
-      checkRedux();
     },
     
     interceptReactRuntime: function() {
@@ -303,7 +325,7 @@
       this.initialized = true;
       
       this.interceptReactRuntime();
-      this.waitForRedux();
+      this.findScriptEditorDispatch();
     }
   };
   
