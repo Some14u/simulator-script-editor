@@ -86,6 +86,34 @@
       });
     },
     
+    setupReduxDispatchInterceptor: function() {
+      const store = this.getReduxStore();
+      if (!store) {
+        console.log('[SimulatorEnhancer] Cannot setup dispatch interceptor - Redux store not available');
+        return;
+      }
+      
+      if (store._originalDispatch) {
+        console.log('[SimulatorEnhancer] Redux dispatch already intercepted');
+        return;
+      }
+      
+      console.log('[SimulatorEnhancer] Setting up Redux dispatch interceptor');
+      
+      const originalDispatch = store.dispatch;
+      store._originalDispatch = originalDispatch;
+      
+      store.dispatch = function(action) {
+        if (action && action.type === 'GET_SCRIPT_STRUCTURE_SUCCESS') {
+          console.log('[SimulatorEnhancer] GET_SCRIPT_STRUCTURE_SUCCESS intercepted:', action);
+        }
+        
+        return originalDispatch.apply(this, arguments);
+      };
+      
+      console.log('[SimulatorEnhancer] Redux dispatch interceptor setup complete');
+    },
+    
     getReduxStore: function() {
       const rootEl = document.getElementById('root');
       if (!rootEl) {
@@ -324,6 +352,8 @@
                 if (!self.reduxInitialized) {
                   self.initializeReduxConnection();
                 }
+                
+                self.setupReduxDispatchInterceptor();
                 
                 if (self.reduxInitialized) {
                   self.dispatchGetScriptStructure();
