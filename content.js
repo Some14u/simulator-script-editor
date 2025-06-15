@@ -35,43 +35,39 @@
     },
     
     refreshScriptStructure: function(callback) {
-      this.debug('API', 'Starting script structure refresh');
+      this.debug('REDUX', 'Starting script structure refresh via Redux dispatch');
       const params = this.getScriptParams();
       if (!params) {
-        this.debug('API', 'Cannot extract script parameters from URL');
+        this.debug('REDUX', 'Cannot extract script parameters from URL');
         if (callback) callback(null);
         return;
       }
       
       const { scriptId } = params;
-      const envId = 'default';
-      const url = `/app_content/struct/${scriptId}/${envId}`;
+      const envId = this.getActiveEnvId();
       
-      this.debug('API', 'Fetching script structure from:', url);
-      
-      fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'same-origin'
-      })
-      .then(response => {
-        this.debug('API', 'Fetch response received:', { status: response.status, ok: response.ok });
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        this.debug('API', 'Script structure data received:', data);
-        this.updateReduxState(data.data);
-        if (callback) callback(data.data);
-      })
-      .catch(error => {
-        this.debug('API', 'Failed to refresh script structure:', error);
+      if (!envId) {
+        this.debug('REDUX', 'Cannot determine active environment ID');
         if (callback) callback(null);
+        return;
+      }
+      
+      const store = this.getReduxStore();
+      if (!store) {
+        this.debug('REDUX', 'Redux store not available for dispatch');
+        if (callback) callback(null);
+        return;
+      }
+      
+      this.debug('REDUX', 'Dispatching GET_SCRIPT_STRUCTURE.REQUEST', { scriptId, envId });
+      
+      store.dispatch({
+        type: 'GET_SCRIPT_STRUCTURE.REQUEST',
+        payload: { scriptId, envId },
+        callback: callback
       });
+      
+      this.debug('REDUX', 'GET_SCRIPT_STRUCTURE.REQUEST dispatched successfully');
     },
     
     getReduxStore: function() {
@@ -113,22 +109,36 @@
       return null;
     },
 
-    updateReduxState: function(structureData) {
-      this.debug('REDUX', 'Attempting to update Redux state with structure data');
+    getActiveEnvId: function() {
+      this.debug('REDUX', 'Searching for active environment ID');
       
       const store = this.getReduxStore();
       if (!store) {
-        this.debug('REDUX', 'Redux store not available');
-        return;
+        this.debug('REDUX', 'Redux store not available for envId lookup');
+        return null;
       }
       
-      this.debug('REDUX', 'Dispatching GET_SCRIPT_STRUCTURE.SUCCESS action');
-      store.dispatch({
-        type: 'GET_SCRIPT_STRUCTURE.SUCCESS',
-        payload: { content: structureData }
-      });
-      
-      this.debug('REDUX', 'Redux state updated with fresh structure');
+      try {
+        const state = store.getState();
+        this.debug('REDUX', 'Redux state retrieved for envId search');
+        
+        if (state.scriptContent && state.scriptContent.envId) {
+          this.debug('REDUX', 'Found envId in scriptContent state:', state.scriptContent.envId);
+          return state.scriptContent.envId;
+        }
+        
+        if (state.scriptEditor && state.scriptEditor.activeEnv) {
+          this.debug('REDUX', 'Found activeEnv in scriptEditor state:', state.scriptEditor.activeEnv);
+          return state.scriptEditor.activeEnv;
+        }
+        
+        this.debug('REDUX', 'EnvId not found in Redux state, using default');
+        return 'default';
+        
+      } catch (error) {
+        this.debug('REDUX', 'Error accessing Redux state for envId:', error);
+        return 'default';
+      }
     },
     
 
@@ -287,7 +297,7 @@
               setTimeout(() => {
                 self.refreshScriptStructure((structure) => {
                   if (structure) {
-                    self.debug('REACT', '✅ Script structure refreshed after file selection');
+                    self.debug('REACT', '✅ Script structure refresh dispatched after file selection');
                   }
                 });
               }, 100);
@@ -313,6 +323,29 @@
       this.initialized = true;
       
       this.interceptReactRuntime();
+      
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          this.debug('INIT', 'DOM loaded, connecting to Redux store');
+          this.connectReduxStore();
+        });
+      } else {
+        this.debug('INIT', 'DOM already loaded, connecting to Redux store immediately');
+        this.connectReduxStore();
+      }
+    },
+    
+    connectReduxStore: function() {
+      this.debug('REDUX', 'Attempting to connect to Redux store');
+      
+      setTimeout(() => {
+        const store = this.getReduxStore();
+        if (store) {
+          this.debug('REDUX', 'Successfully connected to Redux store');
+        } else {
+          this.debug('REDUX', 'Redux store not available, will retry on demand');
+        }
+      }, 500);
     }
   };
   
