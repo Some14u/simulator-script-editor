@@ -1,19 +1,11 @@
 const BUS_ID = 'ext_bridge_bus';
-(function setupBus() {
-  let bus = document.getElementById(BUS_ID);
-  if (!bus) {
-    bus = document.createElement('div');
-    bus.id = BUS_ID;
-    bus.style.display = 'none';
-    bus.dataset.callEvent = 'ext-bridge-call';
-    bus.dataset.responseEvent = 'ext-bridge-response';
-    document.documentElement.appendChild(bus);
-  }
-})();
 
 class ExtensionBridge {
   constructor(busId) {
     this.eventBus = document.getElementById(busId);
+    if (!this.eventBus) {
+      throw new Error(`Bridge bus element with id '${busId}' not found. Make sure ISOLATED world script runs first.`);
+    }
     this._callbacks = new Map();
     this.eventBus.addEventListener(this.eventBus.dataset.responseEvent, this._onResponse.bind(this));
     this.eventBus.addEventListener(this.eventBus.dataset.callEvent, this._onRegister.bind(this));
