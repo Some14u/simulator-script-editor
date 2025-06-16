@@ -13,6 +13,7 @@
     webpackHooksActive: false,
     lastSelectedFile: null,
     pendingFileUpdate: false,
+    reduxStore: null,
 
     debug: function (category, message, ...args) {
       if (!this.debugEnabled) return;
@@ -126,6 +127,10 @@
     },
 
     getReduxStore: function () {
+      if (this.reduxStore) {
+        return this.reduxStore;
+      }
+
       const rootEl = document.getElementById("root");
       if (!rootEl) {
         return null;
@@ -226,7 +231,9 @@
 
       const store = this.getReduxStore();
       if (store) {
+        this.reduxStore = store;
         this.reduxInitialized = true;
+        console.log("[SimulatorEnhancer:INIT] Redux connection established");
       } else {
         console.error("[SimulatorEnhancer:ERROR] Redux connection failed");
       }
@@ -331,6 +338,22 @@
 
       const self = this;
       this.reactRuntime.createElement = function (type, props, ...children) {
+        if (!self.reduxInitialized && props) {
+          const maybeReduxStore =
+            props &&
+            typeof props.store === "object" &&
+            typeof props.store.dispatch === "function" &&
+            typeof props.store.getState === "function" &&
+            typeof props.store.subscribe === "function";
+
+          if (maybeReduxStore) {
+            console.log("[SimulatorEnhancer:INIT] Redux store detected in createElement props");
+            self.reduxStore = props.store;
+            self.reduxInitialized = true;
+            self.setupReduxStoreSubscription();
+          }
+        }
+
         if (
           type &&
           props &&
@@ -355,16 +378,10 @@
               };
               self.pendingFileUpdate = true;
               
-              if (!self.reduxInitialized) {
-                self.initializeReduxConnection();
-              }
-              
-              self.setupReduxStoreSubscription();
-              
               if (self.reduxInitialized) {
                 self.dispatchGetScriptStructure();
               } else {
-                console.error("[SimulatorEnhancer:ERROR] Redux initialization failed, cannot dispatch");
+                console.error("[SimulatorEnhancer:ERROR] Redux not initialized, cannot dispatch");
               }
             };
           }
