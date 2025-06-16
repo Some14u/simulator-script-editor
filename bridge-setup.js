@@ -42,3 +42,5 @@ class ExtensionBridge {
     this.eventBus.dispatchEvent(evt);
   }
 }
+
+window.extensionBridge = new ExtensionBridge(BUS_ID);

@@ -3,7 +3,7 @@
 
   console.log("[SimulatorEnhancer:INIT] Core script loaded in MAIN world");
 
-  const extensionBridge = new ExtensionBridge('ext_bridge_bus');
+  const extensionBridge = window.extensionBridge;
 
   window.SimulatorEnhancer = {
     version: "1.0.0",
