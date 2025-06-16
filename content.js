@@ -49,7 +49,45 @@
       }
     },
 
+    identifyComponent: function(props) {
+      if (!props || typeof props !== 'object') {
+        return null;
+      }
 
+      if (props.store && 
+          typeof props.store === 'object' &&
+          typeof props.store.dispatch === 'function' &&
+          typeof props.store.getState === 'function' &&
+          typeof props.store.subscribe === 'function') {
+        return 'ReduxProvider';
+      }
+
+      if (props.aceEditorRef && 
+          typeof props.aceEditorRef === 'object') {
+        return 'AceEditorReact';
+      }
+
+      if (props.fileId && 
+          props.activeFile && 
+          props.editorRef) {
+        return 'ScriptFileEditor';
+      }
+
+      if (typeof props.handleSelect === 'function' &&
+          props.objContent &&
+          typeof props.objContent === 'object' &&
+          props.objContent.id &&
+          typeof props.objType === 'string' &&
+          typeof props.level === 'number' &&
+          props.hasOwnProperty('activeItem') &&
+          props.hasOwnProperty('handleUpdate') &&
+          props.hasOwnProperty('handleRemove') &&
+          props.hasOwnProperty('handleDuplicate')) {
+        return 'StructureItem';
+      }
+
+      return null;
+    },
 
     dispatchGetScriptStructure: function () {
       const store = this.getReduxStore();
@@ -316,53 +354,49 @@
 
       const self = this;
       this.reactRuntime.createElement = function (type, props, ...children) {
-        if (!self.reduxInitialized && props) {
-          const maybeReduxStore =
-            props &&
-            typeof props.store === "object" &&
-            typeof props.store.dispatch === "function" &&
-            typeof props.store.getState === "function" &&
-            typeof props.store.subscribe === "function";
+        const componentType = self.identifyComponent(props);
+        
+        switch (componentType) {
+          case 'ReduxProvider':
+            if (!self.reduxInitialized) {
+              console.log("[SimulatorEnhancer:INIT] Redux store detected in createElement props");
+              self.reduxStore = props.store;
+              self.reduxInitialized = true;
+              self.setupReduxStoreSubscription();
+            }
+            break;
 
-          if (maybeReduxStore) {
-            console.log("[SimulatorEnhancer:INIT] Redux store detected in createElement props");
-            self.reduxStore = props.store;
-            self.reduxInitialized = true;
-            self.setupReduxStoreSubscription();
-          }
-        }
+          case 'AceEditorReact':
+            self.debug('REACT', 'AceEditorReact component detected');
+            break;
 
-        if (
-          type &&
-          props &&
-          typeof props.objType === "string" &&
-          typeof props.handleSelect === "function" &&
-          typeof props.level === "number" &&
-          props.hasOwnProperty("activeItem") &&
-          props.hasOwnProperty("handleUpdate") &&
-          props.hasOwnProperty("handleRemove") &&
-          props.hasOwnProperty("handleDuplicate")
-        ) {
-          if (props.objType === "file") {
-            const originalHandleSelect = props.handleSelect;
-            props.handleSelect = function (...args) {
-              self.lastSelectedFile = {
-                id: props.id,
-                title: props.title,
-                objType: props.objType,
-                originalHandler: originalHandleSelect,
-                handlerContext: this,
-                handlerArgs: args
+          case 'ScriptFileEditor':
+            self.debug('REACT', 'ScriptFileEditor component detected, fileId:', props.fileId);
+            break;
+
+          case 'StructureItem':
+            if (props.objType === "file") {
+              self.debug('REACT', 'StructureItem (file) component detected');
+              const originalHandleSelect = props.handleSelect;
+              props.handleSelect = function (...args) {
+                self.lastSelectedFile = {
+                  id: props.id,
+                  title: props.title,
+                  objType: props.objType,
+                  originalHandler: originalHandleSelect,
+                  handlerContext: this,
+                  handlerArgs: args
+                };
+                self.pendingFileUpdate = true;
+                
+                if (self.reduxInitialized) {
+                  self.dispatchGetScriptStructure();
+                } else {
+                  console.error("[SimulatorEnhancer:ERROR] Redux not initialized, cannot dispatch");
+                }
               };
-              self.pendingFileUpdate = true;
-              
-              if (self.reduxInitialized) {
-                self.dispatchGetScriptStructure();
-              } else {
-                console.error("[SimulatorEnhancer:ERROR] Redux not initialized, cannot dispatch");
-              }
-            };
-          }
+            }
+            break;
         }
 
         return self.originalCreateElement.apply(self.reactRuntime, [type, props, ...children]);
