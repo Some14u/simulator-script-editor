@@ -1,12 +1,28 @@
 class ConfigManager {
-  constructor(defaultSettings) {
+  constructor() {
     this.storageKey = 'config';
     this.positionsPrefix = 'ace-pos';
-    this.defaultSettings = defaultSettings;
-    this.config = { ...defaultSettings };
+    this.defaultSettings = null;
+    this.config = {};
+  }
+
+  async loadDefaultConfig() {
+    try {
+      const response = await fetch(chrome.runtime.getURL('default-config.json'));
+      this.defaultSettings = await response.json();
+    } catch (error) {
+      console.error('[ConfigManager] Failed to load default-config.json:', error);
+      this.defaultSettings = {
+        maxTotalEntries: 10,
+        debugEnabled: true,
+        enableCursorMemory: true,
+        enableSelectionMemory: true
+      };
+    }
   }
 
   async init() {
+    await this.loadDefaultConfig();
     const result = await chrome.storage.local.get(this.storageKey);
     const stored = result[this.storageKey] || {};
     this.config = { ...this.defaultSettings, ...stored };

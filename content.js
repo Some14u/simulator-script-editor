@@ -25,27 +25,19 @@
 
     async initConfigManager() {
       try {
-        const manifest = chrome.runtime.getManifest();
-        const defaultConfig = manifest.default_config || {
-          maxTotalEntries: 10,
-          debugEnabled: true,
-          enableCursorMemory: true,
-          enableSelectionMemory: true
-        };
-        
-        this.configManager = new ConfigManager(defaultConfig);
+        this.configManager = new ConfigManager();
         await this.configManager.init();
         this.debug('CONFIG', 'ConfigManager initialized with settings:', this.configManager.config);
       } catch (error) {
         console.error('[SimulatorEnhancer:ERROR] Failed to initialize ConfigManager:', error);
-        const fallbackConfig = {
+        this.configManager = new ConfigManager();
+        this.configManager.defaultSettings = {
           maxTotalEntries: 10,
           debugEnabled: true,
           enableCursorMemory: true,
           enableSelectionMemory: true
         };
-        this.configManager = new ConfigManager(fallbackConfig);
-        await this.configManager.init();
+        this.configManager.config = { ...this.configManager.defaultSettings };
       }
     },
 

@@ -1,0 +1,6 @@
+{
+  "maxTotalEntries": 10,
+  "debugEnabled": true,
+  "enableCursorMemory": true,
+  "enableSelectionMemory": true
+}

@@ -18,10 +18,10 @@
       "world": "MAIN"
     }
   ],
-  "default_config": {
-    "maxTotalEntries": 10,
-    "debugEnabled": true,
-    "enableCursorMemory": true,
-    "enableSelectionMemory": true
-  }
+  "web_accessible_resources": [
+    {
+      "resources": ["default-config.json"],
+      "matches": ["*://*.simulator.company/*"]
+    }
+  ]
 }
