@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Browser extension to enhance Simulator.Company script editor functionality",
   "permissions": [
-    "activeTab"
+    "scripting"
   ],
   "host_permissions": [
     "*://*.simulator.company/*"
@@ -13,7 +13,8 @@
     {
       "matches": ["*://*.simulator.company/script/*/edit/*"],
       "js": ["content.js"],
-      "run_at": "document_end"
+      "run_at": "document_start",
+      "world": "MAIN"
     }
   ]
 }
