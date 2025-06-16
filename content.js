@@ -22,16 +22,21 @@
     },
 
     getScriptParams: function () {
-      const path = window.location.pathname;
-      const match = path.match(/\/script\/([^\/]+)\/edit\/([^\/]+)/);
-      if (match) {
+      const scriptEditorComponent = this.findScriptEditorComponent();
+      if (!scriptEditorComponent) {
+        console.error("[SimulatorEnhancer:ERROR] Cannot find script editor component");
+        return null;
+      }
+
+      const activeEnv = this.extractActiveEnvFromHooks(scriptEditorComponent);
+      if (activeEnv && activeEnv.actorId && activeEnv.id) {
         const params = {
-          workspaceId: match[1],
-          scriptId: match[2],
+          workspaceId: activeEnv.id,
+          scriptId: activeEnv.actorId,
         };
         return params;
       }
-      console.error("[SimulatorEnhancer:ERROR] Failed to extract script parameters from URL:", window.location.pathname);
+      console.error("[SimulatorEnhancer:ERROR] Failed to extract script parameters from activeEnv");
       return null;
     },
 
