@@ -14,11 +14,41 @@
     lastSelectedFile: null,
     pendingFileUpdate: false,
     reduxStore: null,
+    configManager: null,
 
     debug: function (category, message, ...args) {
-      if (!this.debugEnabled) return;
-      const timestamp = new Date().toISOString().substr(11, 12);
-      console.log(`[SimulatorEnhancer:${category}:${timestamp}]`, message, ...args);
+      if (!this.configManager || this.configManager.getSetting('debugEnabled')) {
+        const timestamp = new Date().toISOString().substr(11, 12);
+        console.log(`[SimulatorEnhancer:${category}:${timestamp}]`, message, ...args);
+      }
+    },
+
+    async initConfigManager() {
+      try {
+        const manifest = chrome.runtime.getManifest();
+        const defaultConfig = manifest.default_config || {
+          maxTotalEntries: 10,
+          debugEnabled: true,
+          cursorSaveDelay: 1000,
+          enableCursorMemory: true,
+          enableSelectionMemory: true
+        };
+        
+        this.configManager = new ConfigManager(defaultConfig);
+        await this.configManager.init();
+        this.debug('CONFIG', 'ConfigManager initialized with settings:', this.configManager.config);
+      } catch (error) {
+        console.error('[SimulatorEnhancer:ERROR] Failed to initialize ConfigManager:', error);
+        const fallbackConfig = {
+          maxTotalEntries: 10,
+          debugEnabled: true,
+          cursorSaveDelay: 1000,
+          enableCursorMemory: true,
+          enableSelectionMemory: true
+        };
+        this.configManager = new ConfigManager(fallbackConfig);
+        await this.configManager.init();
+      }
     },
 
 
@@ -366,7 +396,7 @@
       this.pendingFileUpdate = false;
     },
 
-    init: function() {
+    async init() {
       if (this.initialized) {
         return;
       }
@@ -374,14 +404,20 @@
       console.log("[SimulatorEnhancer:INIT] Initializing core functionality...");
       this.initialized = true;
       
+      await this.initConfigManager();
+      
       this.setupReduxStoreSubscription();
       this.interceptReactRuntime();
       
       window.addEventListener('beforeunload', () => {
         this.cleanup();
       });
+      
+      console.log("[SimulatorEnhancer:INIT] ConfigManager initialized successfully");
     }
   };
 
-  window.SimulatorEnhancer.init();
+  window.SimulatorEnhancer.init().catch(error => {
+    console.error('[SimulatorEnhancer:ERROR] Failed to initialize:', error);
+  });
 })();

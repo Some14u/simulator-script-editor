@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "description": "Browser extension to enhance Simulator.Company script editor functionality",
   "permissions": [
-    "scripting"
+    "scripting",
+    "storage"
   ],
   "host_permissions": [
     "*://*.simulator.company/*"
@@ -12,9 +13,16 @@
   "content_scripts": [
     {
       "matches": ["*://*.simulator.company/script/*/edit/*"],
-      "js": ["content.js"],
+      "js": ["ConfigManager.js", "content.js"],
       "run_at": "document_start",
       "world": "MAIN"
     }
-  ]
+  ],
+  "default_config": {
+    "maxTotalEntries": 10,
+    "debugEnabled": true,
+    "cursorSaveDelay": 1000,
+    "enableCursorMemory": true,
+    "enableSelectionMemory": true
+  }
 }
