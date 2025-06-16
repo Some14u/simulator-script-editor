@@ -36,24 +36,18 @@ class ContentBridge {
   }
 }
 
-function setupBus() {
-  let bus = document.getElementById(BUS_ID);
-  if (!bus) {
-    bus = document.createElement('div');
-    bus.id = BUS_ID;
-    bus.style.display = 'none';
-    bus.dataset.callEvent = 'ext-bridge-call';
-    bus.dataset.responseEvent = 'ext-bridge-response';
-    document.documentElement.appendChild(bus);
-  }
+let bus = document.getElementById(BUS_ID);
+if (!bus) {
+  bus = document.createElement('div');
+  bus.id = BUS_ID;
+  bus.style.display = 'none';
+  bus.dataset.callEvent = 'ext-bridge-call';
+  bus.dataset.responseEvent = 'ext-bridge-response';
+  document.documentElement.appendChild(bus);
 }
 
-setupBus();
-
-(async function initContentBridge() {
-  const bridge = new ContentBridge(BUS_ID);
-  const configManager = new ConfigManager();
-  await configManager.init();
-  bridge.registerInstanceApi(configManager);
-  console.log('[ContentBridge] ConfigManager API registered');
-})();
+const bridge = new ContentBridge(BUS_ID);
+const configManager = new ConfigManager();
+await configManager.init();
+bridge.registerInstanceApi(configManager);
+console.log('[ContentBridge] ConfigManager API registered');
