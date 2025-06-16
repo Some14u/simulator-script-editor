@@ -46,10 +46,8 @@ if (!bus) {
   document.documentElement.appendChild(bus);
 }
 
-(async () => {
-  const bridge = new ContentBridge(BUS_ID);
-  const configManager = new ConfigManager();
-  await configManager.init();
-  bridge.registerInstanceApi(configManager);
-  console.log('[ContentBridge] ConfigManager API registered');
-})();
+const bridge = new ContentBridge(BUS_ID);
+const configManager = new ConfigManager();
+bridge.registerInstanceApi(configManager);
+configManager.init();
+console.log('[ContentBridge] ConfigManager API registered');
