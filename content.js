@@ -29,7 +29,6 @@
         const defaultConfig = manifest.default_config || {
           maxTotalEntries: 10,
           debugEnabled: true,
-          cursorSaveDelay: 1000,
           enableCursorMemory: true,
           enableSelectionMemory: true
         };
@@ -42,7 +41,6 @@
         const fallbackConfig = {
           maxTotalEntries: 10,
           debugEnabled: true,
-          cursorSaveDelay: 1000,
           enableCursorMemory: true,
           enableSelectionMemory: true
         };
