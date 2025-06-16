@@ -21,55 +21,7 @@
       console.log(`[SimulatorEnhancer:${category}:${timestamp}]`, message, ...args);
     },
 
-    getScriptParams: function () {
-      const scriptEditorComponent = this.findScriptEditorComponent();
-      if (!scriptEditorComponent) {
-        console.error("[SimulatorEnhancer:ERROR] Cannot find script editor component");
-        return null;
-      }
 
-      const activeEnv = this.extractActiveEnvFromHooks(scriptEditorComponent);
-      if (activeEnv && activeEnv.actorId && activeEnv.id) {
-        const params = {
-          workspaceId: activeEnv.id,
-          scriptId: activeEnv.actorId,
-        };
-        return params;
-      }
-      console.error("[SimulatorEnhancer:ERROR] Failed to extract script parameters from activeEnv");
-      return null;
-    },
-
-    refreshScriptStructure: function (callback) {
-      const params = this.getScriptParams();
-      if (!params) {
-        console.error("[SimulatorEnhancer:ERROR] Cannot extract script parameters from URL");
-        if (callback) callback(null);
-        return;
-      }
-
-      const { scriptId } = params;
-      const envId = this.getActiveEnvId();
-
-      if (!envId) {
-        console.error("[SimulatorEnhancer:ERROR] Cannot determine active environment ID");
-        if (callback) callback(null);
-        return;
-      }
-
-      const store = this.getReduxStore();
-      if (!store) {
-        console.error("[SimulatorEnhancer:ERROR] Redux store not available for dispatch");
-        if (callback) callback(null);
-        return;
-      }
-
-      store.dispatch({
-        type: "GET_SCRIPT_STRUCTURE_REQUEST",
-        payload: { scriptId, envId },
-        callback: callback,
-      });
-    },
 
     dispatchGetScriptStructure: function () {
       const store = this.getReduxStore();
@@ -78,18 +30,15 @@
         return;
       }
 
-      const params = this.getScriptParams();
-      if (!params) {
-        console.error("[SimulatorEnhancer:ERROR] Cannot extract script parameters from URL");
+      const activeEnv = this.getActiveEnv();
+      if (!activeEnv || !activeEnv.actorId || !activeEnv.id) {
+        console.error("[SimulatorEnhancer:ERROR] Cannot extract activeEnv or missing actorId/id");
         return;
       }
 
-      const { scriptId } = params;
-      const envId = this.getActiveEnvId();
-
       store.dispatch({
         type: "GET_SCRIPT_STRUCTURE_REQUEST",
-        payload: { scriptId, envId },
+        payload: { scriptId: activeEnv.actorId, envId: activeEnv.id },
       });
     },
     
@@ -160,18 +109,14 @@
       return null;
     },
 
-    getActiveEnvId: function () {
+    getActiveEnv: function () {
       const scriptEditorComponent = this.findScriptEditorComponent();
       if (!scriptEditorComponent) {
-        return "default";
+        return null;
       }
 
       const activeEnv = this.extractActiveEnvFromHooks(scriptEditorComponent);
-      if (activeEnv && activeEnv.id) {
-        return activeEnv.id;
-      }
-
-      return "default";
+      return activeEnv;
     },
 
     findScriptEditorComponent: function () {
