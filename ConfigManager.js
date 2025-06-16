@@ -29,6 +29,10 @@ class ConfigManager {
     await this.cleanupOldEntries();
   }
 
+  async getConfig() {
+    return this.config;
+  }
+
   getSetting(key) {
     return this.config[key];
   }

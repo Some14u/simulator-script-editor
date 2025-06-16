@@ -3,6 +3,8 @@
 
   console.log("[SimulatorEnhancer:INIT] Core script loaded in MAIN world");
 
+  const extensionBridge = new ExtensionBridge('ext_bridge_bus');
+
   window.SimulatorEnhancer = {
     version: "1.0.0",
     initialized: false,
@@ -25,19 +27,32 @@
 
     async initConfigManager() {
       try {
-        this.configManager = new ConfigManager();
-        await this.configManager.init();
-        this.debug('CONFIG', 'ConfigManager initialized with settings:', this.configManager.config);
+        let attempts = 0;
+        while (!extensionBridge.configManager && attempts < 50) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+        
+        if (!extensionBridge.configManager) {
+          throw new Error('ConfigManager API not available via bridge');
+        }
+        
+        this.configManager = extensionBridge.configManager;
+        const config = await this.configManager.getConfig();
+        this.debug('CONFIG', 'ConfigManager initialized via bridge with settings:', config);
       } catch (error) {
-        console.error('[SimulatorEnhancer:ERROR] Failed to initialize ConfigManager:', error);
-        this.configManager = new ConfigManager();
-        this.configManager.defaultSettings = {
-          maxTotalEntries: 10,
-          debugEnabled: true,
-          enableCursorMemory: true,
-          enableSelectionMemory: true
+        console.error('[SimulatorEnhancer:ERROR] Failed to initialize ConfigManager via bridge:', error);
+        this.configManager = {
+          getSetting: (key) => {
+            const fallback = {
+              maxTotalEntries: 10,
+              debugEnabled: true,
+              enableCursorMemory: true,
+              enableSelectionMemory: true
+            };
+            return fallback[key];
+          }
         };
-        this.configManager.config = { ...this.configManager.defaultSettings };
       }
     },
 
