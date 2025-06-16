@@ -36,10 +36,7 @@ class ContentBridge {
   }
 }
 
-const setupBusScript = document.createElement('script');
-setupBusScript.textContent = `
-const BUS_ID = 'ext_bridge_bus';
-(function setupBus() {
+function setupBus() {
   let bus = document.getElementById(BUS_ID);
   if (!bus) {
     bus = document.createElement('div');
@@ -49,9 +46,9 @@ const BUS_ID = 'ext_bridge_bus';
     bus.dataset.responseEvent = 'ext-bridge-response';
     document.documentElement.appendChild(bus);
   }
-})();
-`;
-document.documentElement.appendChild(setupBusScript);
+}
+
+setupBus();
 
 (async function initContentBridge() {
   const bridge = new ContentBridge(BUS_ID);

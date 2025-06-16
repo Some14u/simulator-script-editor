@@ -13,7 +13,7 @@
   "content_scripts": [
     {
       "matches": ["*://*.simulator.company/script/*/edit/*"],
-      "js": ["ConfigManager.js", "content-bridge.js"],
+      "js": ["config-manager.js", "content-bridge.js"],
       "run_at": "document_start",
       "world": "ISOLATED"
     },
