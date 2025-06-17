@@ -267,6 +267,17 @@
       return activeFile;
     },
 
+    getAceEditor: function () {
+      const container = document.querySelector('.ace_editor');
+      if (window.ace && typeof window.ace.edit === 'function') {
+        return window.ace.edit(container);
+      }
+      if (container && container.env && container.env.editor) {
+        return container.env.editor;
+      }
+      return null;
+    },
+
 
 
     interceptReactRuntime: function () {
