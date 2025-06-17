@@ -39,7 +39,6 @@
         
         this.configManager = extensionBridge.configManager;
         const config = await this.configManager.getConfig();
-        this.debug('CONFIG', 'ConfigManager initialized via bridge with settings:', config);
       } catch (error) {
         console.error('[SimulatorEnhancer:ERROR] Failed to initialize ConfigManager via bridge:', error);
         this.configManager = {
@@ -115,12 +114,10 @@
     setupReduxStoreSubscription: function() {
       const store = this.getReduxStore();
       if (!store || !store.subscribe) {
-        console.log('[SimulatorEnhancer] Redux store or subscribe method not found');
         return;
       }
       
       if (this.storeUnsubscribe) {
-        console.log('[SimulatorEnhancer] Store subscription already established');
         return;
       }
       
@@ -147,7 +144,6 @@
       });
       
       this.storeUnsubscribe = unsubscribe;
-      console.log('[SimulatorEnhancer] Store subscription established');
     },
 
     getReduxStore: function () {
@@ -285,7 +281,6 @@
           const isReact = !isNamespaceWrapper(exports) && exports.createElement && !(exports.h && exports.options);
 
           if (isReact) {
-            console.log("[SimulatorEnhancer:INIT] React runtime captured successfully");
             self.reactRuntime = exports;
             self.originalCreateElement = exports.createElement;
             self.overrideCreateElement();
@@ -316,8 +311,6 @@
         return;
       }
 
-      console.log("[SimulatorEnhancer:INIT] React.createElement override established");
-
       const self = this;
       this.reactRuntime.createElement = function (type, props, ...children) {
         const componentType = self.identifyComponent(props);
@@ -325,7 +318,6 @@
         switch (componentType) {
           case 'ReduxProvider':
             if (!self.reduxInitialized) {
-              console.log("[SimulatorEnhancer:INIT] Redux store detected in createElement props");
               self.reduxStore = props.store;
               self.reduxInitialized = true;
               self.setupReduxStoreSubscription();
@@ -333,16 +325,13 @@
             break;
 
           case 'AceEditorReact':
-            self.debug('REACT', 'AceEditorReact component detected');
             break;
 
           case 'ScriptFileEditor':
-            self.debug('REACT', 'ScriptFileEditor component detected, fileId:', props.fileId);
             break;
 
           case 'StructureItem':
             if (props.objType === "file") {
-              self.debug('REACT', 'StructureItem (file) component detected');
               const originalHandleSelect = props.handleSelect;
               props.handleSelect = function (...args) {
                 self.lastSelectedFile = {
@@ -410,8 +399,6 @@
       window.addEventListener('beforeunload', () => {
         this.cleanup();
       });
-      
-      console.log("[SimulatorEnhancer:INIT] ConfigManager initialized successfully");
     }
   };
 
