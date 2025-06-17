@@ -4,7 +4,10 @@ class ContentBridge {
   constructor(busId) {
     this.eventBus = document.getElementById(busId);
     this._instances = {};
+    this._registrationQueue = [];
+    this._mainWorldReady = false;
     this.eventBus.addEventListener(this.eventBus.dataset.callEvent, this._handleCall.bind(this));
+    document.addEventListener('ext-bridge-main-ready', this._onMainWorldReady.bind(this));
   }
   dispatchBusEvent(name, detail) {
     let payload = detail;
@@ -22,7 +25,26 @@ class ContentBridge {
     const apiName = instance.constructor.name.charAt(0).toLowerCase() + instance.constructor.name.slice(1);
     const methods = this.getMethodNames(instance);
     this._instances[apiName] = { instance, methods };
-    this.dispatchBusEvent(this.eventBus.dataset.callEvent, { type: 'REGISTER_API', apiName, methods });
+    
+    const registrationData = { type: 'REGISTER_API', apiName, methods };
+    
+    if (this._mainWorldReady) {
+      this.dispatchBusEvent(this.eventBus.dataset.callEvent, registrationData);
+    } else {
+      this._registrationQueue.push(registrationData);
+      console.log(`[ContentBridge] Queued API registration for ${apiName}, waiting for MAIN world readiness`);
+    }
+  }
+  
+  _onMainWorldReady() {
+    console.log('[ContentBridge] MAIN world bridge ready, processing queued registrations');
+    this._mainWorldReady = true;
+    
+    while (this._registrationQueue.length > 0) {
+      const registrationData = this._registrationQueue.shift();
+      this.dispatchBusEvent(this.eventBus.dataset.callEvent, registrationData);
+      console.log(`[ContentBridge] Processed queued registration for ${registrationData.apiName}`);
+    }
   }
   async _handleCall(e) {
     const msg = e.detail;

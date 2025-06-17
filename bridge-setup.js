@@ -44,3 +44,11 @@ class ExtensionBridge {
 }
 
 window.extensionBridge = new ExtensionBridge(BUS_ID);
+
+const readyEvent = new CustomEvent('ext-bridge-main-ready', { 
+  detail: { timestamp: Date.now() },
+  bubbles: false,
+  composed: false 
+});
+document.dispatchEvent(readyEvent);
+console.log('[ExtensionBridge] MAIN world bridge ready, signaled to ISOLATED world');
