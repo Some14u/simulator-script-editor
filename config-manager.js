@@ -4,6 +4,7 @@ class ConfigManager {
     this.positionsPrefix = 'ace-pos';
     this.defaultSettings = null;
     this.config = {};
+    this.initialized = false;
   }
 
   async loadDefaultConfig() {
@@ -22,14 +23,24 @@ class ConfigManager {
   }
 
   async init() {
-    await this.loadDefaultConfig();
-    const result = await chrome.storage.local.get(this.storageKey);
-    const stored = result[this.storageKey] || {};
-    this.config = { ...this.defaultSettings, ...stored };
-    await this.cleanupOldEntries();
+    try {
+      await this.loadDefaultConfig();
+      const result = await chrome.storage.local.get(this.storageKey);
+      const stored = result[this.storageKey] || {};
+      this.config = { ...this.defaultSettings, ...stored };
+      await this.cleanupOldEntries();
+      this.initialized = true;
+    } catch (error) {
+      console.error('[ConfigManager] Initialization failed:', error);
+      this.initialized = false;
+      throw error;
+    }
   }
 
   async getConfig() {
+    if (!this.initialized) {
+      throw new Error('[ConfigManager] getConfig() called before successful initialization. Call init() first.');
+    }
     return this.config;
   }
 
