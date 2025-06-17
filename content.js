@@ -81,9 +81,6 @@
       }
 
       if (typeof props.handleSelect === 'function' &&
-          props.objContent &&
-          typeof props.objContent === 'object' &&
-          props.objContent.id &&
           typeof props.objType === 'string' &&
           typeof props.level === 'number' &&
           props.hasOwnProperty('activeItem') &&
@@ -154,32 +151,7 @@
     },
 
     getReduxStore: function () {
-      if (this.reduxStore) {
-        return this.reduxStore;
-      }
-
-      const rootEl = document.getElementById("root");
-      if (!rootEl) {
-        return null;
-      }
-
-      const fiberKey = Object.keys(rootEl).find((k) => k.startsWith("__reactContainer$") || k.startsWith("__reactInternalInstance$"));
-
-      if (!fiberKey) {
-        return null;
-      }
-
-      const fiber = rootEl[fiberKey].current || rootEl[fiberKey];
-      if (!fiber || !fiber.memoizedState || !fiber.memoizedState.element || !fiber.memoizedState.element.props) {
-        return null;
-      }
-
-      const store = fiber.memoizedState.element.props.store;
-      if (store && typeof store.dispatch === "function") {
-        return store;
-      }
-
-      return null;
+      return this.reduxStore;
     },
 
     getActiveEnv: function () {
@@ -247,20 +219,7 @@
       return hasRequiredProps;
     },
 
-    initializeReduxConnection: function () {
-      if (this.reduxInitialized) {
-        return;
-      }
 
-      const store = this.getReduxStore();
-      if (store) {
-        this.reduxStore = store;
-        this.reduxInitialized = true;
-        console.log("[SimulatorEnhancer:INIT] Redux connection established");
-      } else {
-        console.error("[SimulatorEnhancer:ERROR] Redux connection failed");
-      }
-    },
 
     interceptReactRuntime: function () {
       if (this.webpackHooksActive) {
