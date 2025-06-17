@@ -227,6 +227,46 @@
       return hasRequiredProps;
     },
 
+    isActiveFileObject: function (obj) {
+      if (!obj || typeof obj !== "object") return false;
+
+      const hasRequiredProps =
+        typeof obj.id !== "undefined" &&
+        obj.objType === "file" &&
+        typeof obj.createdAt === "number" &&
+        typeof obj.folderId === "number" &&
+        typeof obj.source === "string";
+
+      return hasRequiredProps;
+    },
+
+    extractActiveFileFromHooks: function (scriptEditorFiber) {
+      if (!scriptEditorFiber.memoizedState) return null;
+
+      let hook = scriptEditorFiber.memoizedState;
+      while (hook) {
+        const state = hook.memoizedState;
+
+        if (this.isActiveFileObject(state)) {
+          return state;
+        }
+
+        hook = hook.next;
+      }
+
+      return null;
+    },
+
+    getActiveFile: function () {
+      const scriptEditorComponent = this.findScriptEditorComponent();
+      if (!scriptEditorComponent) {
+        return null;
+      }
+
+      const activeFile = this.extractActiveFileFromHooks(scriptEditorComponent);
+      return activeFile;
+    },
+
 
 
     interceptReactRuntime: function () {
