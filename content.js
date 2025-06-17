@@ -69,13 +69,18 @@
       }
 
       if (props.aceEditorRef && 
-          typeof props.aceEditorRef === 'object') {
+          typeof props.aceEditorRef === 'object' &&
+          typeof props.mode === 'string' &&
+          typeof props.theme === 'string' &&
+          typeof props.text === 'string') {
         return 'AceEditorReact';
       }
 
       if (props.fileId && 
-          props.activeFile && 
-          props.editorRef) {
+          typeof props.readOnly === 'boolean' &&
+          typeof props.showPanel === 'boolean' &&
+          typeof props.handleTogglePanel === 'function' &&
+          typeof props.handleChange === 'function') {
         return 'ScriptFileEditor';
       }
 
