@@ -76,6 +76,13 @@
         return 'AceEditorReact';
       }
 
+      if (props.jsonEditorRef && 
+          typeof props.jsonEditorRef === 'object' &&
+          typeof props.schema === 'object' &&
+          (props.hasOwnProperty('json') || props.hasOwnProperty('text'))) {
+        return 'JSONEditorReact';
+      }
+
       if (props.fileId && 
           typeof props.readOnly === 'boolean' &&
           typeof props.showPanel === 'boolean' &&
