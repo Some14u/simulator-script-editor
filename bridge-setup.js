@@ -41,14 +41,17 @@ class ExtensionBridge {
     const evt = new CustomEvent(name, { detail, bubbles: false, composed: false });
     this.eventBus.dispatchEvent(evt);
   }
+  
+  signalReady() {
+    const readyEvent = new CustomEvent('ext-bridge-main-ready', { 
+      detail: { timestamp: Date.now() },
+      bubbles: false,
+      composed: false 
+    });
+    document.dispatchEvent(readyEvent);
+    console.log('[ExtensionBridge] MAIN world bridge ready, signaled to ISOLATED world');
+  }
 }
 
 window.extensionBridge = new ExtensionBridge(BUS_ID);
-
-const readyEvent = new CustomEvent('ext-bridge-main-ready', { 
-  detail: { timestamp: Date.now() },
-  bubbles: false,
-  composed: false 
-});
-document.dispatchEvent(readyEvent);
-console.log('[ExtensionBridge] MAIN world bridge ready, signaled to ISOLATED world');
+window.extensionBridge.signalReady();
