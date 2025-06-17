@@ -5,6 +5,7 @@ class ConfigManager {
     this.defaultSettings = null;
     this.config = {};
     this.initialized = false;
+    this.initPromise = null;
   }
 
   async loadDefaultConfig() {
@@ -23,23 +24,37 @@ class ConfigManager {
   }
 
   async init() {
-    try {
-      await this.loadDefaultConfig();
-      const result = await chrome.storage.local.get(this.storageKey);
-      const stored = result[this.storageKey] || {};
-      this.config = { ...this.defaultSettings, ...stored };
-      await this.cleanupOldEntries();
-      this.initialized = true;
-    } catch (error) {
-      console.error('[ConfigManager] Initialization failed:', error);
-      this.initialized = false;
-      throw error;
+    if (this.initPromise) {
+      return this.initPromise;
     }
+
+    this.initPromise = (async () => {
+      try {
+        await this.loadDefaultConfig();
+        const result = await chrome.storage.local.get(this.storageKey);
+        const stored = result[this.storageKey] || {};
+        this.config = { ...this.defaultSettings, ...stored };
+        await this.cleanupOldEntries();
+        this.initialized = true;
+        return this.config;
+      } catch (error) {
+        console.error('[ConfigManager] Initialization failed:', error);
+        this.initialized = false;
+        this.initPromise = null;
+        throw error;
+      }
+    })();
+
+    return this.initPromise;
   }
 
   async getConfig() {
     if (!this.initialized) {
-      throw new Error('[ConfigManager] getConfig() called before successful initialization. Call init() first.');
+      if (this.initPromise) {
+        await this.initPromise;
+      } else {
+        await this.init();
+      }
     }
     return this.config;
   }
